@@ -11,6 +11,21 @@ hunter_add_package(Sugar)
 include("${SUGAR_ROOT}/cmake/Sugar")
 include(sugar_include)
 
+set(is_android ${ANDROID}) # syntax compatibility
+string(COMPARE EQUAL "${CMAKE_OSX_SYSROOT}" "iphoneos" is_ios)
+string(COMPARE EQUAL "${CMAKE_SYSTEM_NAME}" "Linux" is_linux)
+string(COMPARE EQUAL "${CMAKE_GENERATOR}" "Xcode" is_xcode)
+
+# See: cmake/Hunter/config.cmake
+# First call to 'hunter_add_package' will contains read of Hunter/config.cmake
+# Next variables will be used:
+#   * is_ios
+#   * is_linux
+hunter_add_package(Sugar)
+include("${SUGAR_ROOT}/cmake/Sugar")
+include(sugar_include)
+
+
 include(CheckSymbolExists)
 include(CheckFunctionExists)
 
@@ -20,22 +35,34 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 file(GLOB sources *.c dns/*.c)
 set_source_files_properties(dns/dns.c PROPERTIES COMPILE_FLAGS -std=c99)
 
+set(headers "")
+foreach(x ${GPUIMAGE_SOURCES})
+  string(REGEX MATCH ".*\\.h$" is_header "${x}")
+  if(is_header)
+    list(APPEND headers "${x}")
+  endif()
+endforeach()
+
 if(MILL_STATIC_LIB)
 add_library(mill STATIC ${sources})
+set_target_properties(mill PROPERTIES OUTPUT_NAME mill)
+install(FILES ${headers} DESTINATION "include/GPUImage")
 endif()
 
 if(MILL_SHARED_LIB)
 add_library(mill_s SHARED ${sources})
-endif()
-
 set_target_properties(mill_s PROPERTIES OUTPUT_NAME mill)
+install(FILES ${headers} DESTINATION "include/GPUImage")
+endif()
 
 # check and enable rt if available
 list(APPEND CMAKE_REQUIRED_LIBRARIES rt)
 check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
 if(HAVE_CLOCK_GETTIME)
   target_link_libraries(mill rt)
-  target_link_libraries(mill_s rt)
+  if(MILL_SHARED_LIB)
+    target_link_libraries(mill_s rt)
+  endif()
 endif()
 
 set(CMAKE_REQUIRED_LIBRARIES )
