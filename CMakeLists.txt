@@ -1,5 +1,6 @@
+# Modified by Luc Michalski - 2016
+
 cmake_minimum_required(VERSION 3.5)
-project(libmill C)
 
 include("cmake/HunterGate.cmake")
 HunterGate(
@@ -7,23 +8,35 @@ HunterGate(
     SHA1 "a7ba9775c1206ced7cac204db802b116736ca481"
 )
 
-hunter_add_package(Sugar)
-include("${SUGAR_ROOT}/cmake/Sugar")
-include(sugar_include)
+project(libmill C)
 
-set(is_android ${ANDROID}) # syntax compatibility
-string(COMPARE EQUAL "${CMAKE_OSX_SYSROOT}" "iphoneos" is_ios)
-string(COMPARE EQUAL "${CMAKE_SYSTEM_NAME}" "Linux" is_linux)
-string(COMPARE EQUAL "${CMAKE_GENERATOR}" "Xcode" is_xcode)
+#### settings 
 
-# See: cmake/Hunter/config.cmake
-# First call to 'hunter_add_package' will contains read of Hunter/config.cmake
-# Next variables will be used:
-#   * is_ios
-#   * is_linux
-hunter_add_package(Sugar)
-include("${SUGAR_ROOT}/cmake/Sugar")
-include(sugar_include)
+option(MILL_STATIC_LIB "Build static librairies" ON)
+option(MILL_SHARED_LIB "Build shared librairies" ON)
+option(MILL_PERFS "Build performances tests" OFF)
+option(MILL_TESTS "Build unit tests" OFF)
+
+#### install 
+
+set(config_install_dir "lib/cmake/${PROJECT_NAME}")
+set(include_install_dir "include")
+
+set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+# Configuration
+set(version_config "${generated_dir}/${PROJECT_NAME}ConfigVersion.cmake")
+set(project_config "${generated_dir}/${PROJECT_NAME}Config.cmake")
+set(targets_export_name "${PROJECT_NAME}Targets")
+set(namespace "${PROJECT_NAME}::")
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+  "cmake/Config.cmake.in"
+  "${project_config}"
+  INSTALL_DESTINATION "${config_install_dir}"
+  )
 
 
 include(CheckSymbolExists)
@@ -36,24 +49,72 @@ file(GLOB sources *.c dns/*.c)
 set_source_files_properties(dns/dns.c PROPERTIES COMPILE_FLAGS -std=c99)
 
 set(headers "")
-foreach(x ${GPUIMAGE_SOURCES})
+foreach(x ${sources})
   string(REGEX MATCH ".*\\.h$" is_header "${x}")
   if(is_header)
     list(APPEND headers "${x}")
   endif()
 endforeach()
 
+foreach(HEADER ${headers})
+  install(
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}"
+    DESTINATION "${include_install_dir}/${PROJECT_NAME}"
+    )
+endforeach()
+
 if(MILL_STATIC_LIB)
 add_library(mill STATIC ${sources})
 set_target_properties(mill PROPERTIES OUTPUT_NAME mill)
-install(FILES ${headers} DESTINATION "include/GPUImage")
+
+install(
+  TARGETS mill
+  EXPORT "${targets_export_name}"
+  LIBRARY DESTINATION "lib"
+  ARCHIVE DESTINATION "lib"
+  RUNTIME DESTINATION "bin"
+  INCLUDES DESTINATION "${include_install_dir}"
+  )
+
+install(
+  FILES "${project_config}" "${version_config}"
+  DESTINATION "${config_install_dir}"
+  )
+
+install(
+  EXPORT "${targets_export_name}"
+  NAMESPACE "${namespace}"
+  DESTINATION "${config_install_dir}"
+  )
+
 endif()
 
 if(MILL_SHARED_LIB)
 add_library(mill_s SHARED ${sources})
 set_target_properties(mill_s PROPERTIES OUTPUT_NAME mill)
-install(FILES ${headers} DESTINATION "include/GPUImage")
+
+install(
+  TARGETS mill_s
+  EXPORT "${targets_export_name}"
+  LIBRARY DESTINATION "lib"
+  ARCHIVE DESTINATION "lib"
+  RUNTIME DESTINATION "bin"
+  INCLUDES DESTINATION "${include_install_dir}"
+  )
+
+install(
+  FILES "${project_config}" "${version_config}"
+  DESTINATION "${config_install_dir}"
+  )
+
+install(
+  EXPORT "${targets_export_name}"
+  NAMESPACE "${namespace}"
+  DESTINATION "${config_install_dir}"
+  )
+
 endif()
+
 
 # check and enable rt if available
 list(APPEND CMAKE_REQUIRED_LIBRARIES rt)
@@ -112,3 +173,8 @@ foreach(perf_file IN LISTS perf_files)
   target_link_libraries(perf_${perf_name} mill)
 endforeach()
 endif()
+
+install(TARGETS mill DESTINATION "lib" EXPORT LibMill)
+install(
+    EXPORT LibMill NAMESPACE LibMill:: DESTINATION "lib/cmake/LibMill"
+)
