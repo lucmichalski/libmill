@@ -9,8 +9,15 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 # static and shared libs
 file(GLOB sources *.c dns/*.c)
 set_source_files_properties(dns/dns.c PROPERTIES COMPILE_FLAGS -std=c99)
+
+if(MILL_STATIC_LIB)
 add_library(mill STATIC ${sources})
+endif()
+
+if(MILL_SHARED_LIB)
 add_library(mill_s SHARED ${sources})
+endif()
+
 set_target_properties(mill_s PROPERTIES OUTPUT_NAME mill)
 
 # check and enable rt if available
@@ -39,6 +46,7 @@ if(HAVE_POSIX_MEMALIGN)
   add_definitions(-DHAVE_POSIX_MEMALIGN)
 endif()
 
+if(MILL_TESTS)
 # tests
 enable_testing()
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
@@ -52,7 +60,9 @@ foreach(test_file IN LISTS test_files)
   target_link_libraries(test_${test_name} mill)
   add_test(test_${test_name} tests/${test_name})
 endforeach()
+endif()
 
+if(MILL_PERFS)
 # perf
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/perf)
 file(GLOB perf_files perf/*.c)
@@ -64,3 +74,4 @@ foreach(perf_file IN LISTS perf_files)
     OUTPUT_NAME ${perf_name})
   target_link_libraries(perf_${perf_name} mill)
 endforeach()
+endif()
